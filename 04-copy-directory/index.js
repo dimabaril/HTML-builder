@@ -6,12 +6,15 @@ const destinationDirPath = path.join(__dirname, 'files-copy');
 
 async function makeDirectory(destinationDirPath) {
   try {
-    await fs.access(destinationDirPath);
-    console.log(`Директорий уже существует: ${destinationDirPath}`);
-  } catch (_err) {
     const dirCreation = await fs.mkdir(destinationDirPath, { recursive: true });
-    console.log(`Создан директорий: ${dirCreation}`);
+    if (dirCreation) {
+      console.log(`Создан директорий: ${dirCreation}`);
+    } else {
+      console.log(`Директорий уже существует: ${destinationDirPath}`);
+    }
     return dirCreation;
+  } catch (err) {
+    console.error(err);
   }
 }
 
@@ -31,5 +34,5 @@ async function copyFiles(originDirPath, destinationDirPath) {
   }
 }
 
-makeDirectory(destinationDirPath).catch(console.error);
+makeDirectory(destinationDirPath);
 copyFiles(originDirPath, destinationDirPath);
