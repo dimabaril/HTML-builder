@@ -1,16 +1,16 @@
 const fs = require('fs').promises;
 const path = require('path');
 
-const originDirPath = path.join(__dirname, 'files');
-const destinationDirPath = path.join(__dirname, 'files-copy');
+const originDir = path.join(__dirname, 'files');
+const destinationDir = path.join(__dirname, 'files-copy');
 
-async function makeDirectory(destinationDirPath) {
+async function makeDirectory(destinationDir) {
   try {
-    const dirCreation = await fs.mkdir(destinationDirPath, { recursive: true });
+    const dirCreation = await fs.mkdir(destinationDir, { recursive: true });
     if (dirCreation) {
       console.log(`Создан директорий: ${dirCreation}`);
     } else {
-      console.log(`Директорий уже существует: ${destinationDirPath}`);
+      console.log(`Директорий уже существует: ${destinationDir}`);
     }
     return dirCreation;
   } catch (err) {
@@ -18,12 +18,12 @@ async function makeDirectory(destinationDirPath) {
   }
 }
 
-async function copyFiles(originDirPath, destinationDirPath) {
+async function copyFiles(originDir, destinationDir) {
   try {
-    const files = await fs.readdir(originDirPath);
+    const files = await fs.readdir(originDir);
     for (const file of files) {
-      const originFilePath = path.join(originDirPath, file);
-      const destinationFilePath = path.join(destinationDirPath, file);
+      const originFilePath = path.join(originDir, file);
+      const destinationFilePath = path.join(destinationDir, file);
       await fs.copyFile(originFilePath, destinationFilePath);
       console.log(
         `**********\nfile:\n${originFilePath}\nwas copied to:\n${destinationFilePath}`,
@@ -34,5 +34,13 @@ async function copyFiles(originDirPath, destinationDirPath) {
   }
 }
 
-makeDirectory(destinationDirPath);
-copyFiles(originDirPath, destinationDirPath);
+async function main(originDir, destinationDir) {
+  try {
+    await makeDirectory(destinationDir);
+    await copyFiles(originDir, destinationDir);
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+main(originDir, destinationDir);
