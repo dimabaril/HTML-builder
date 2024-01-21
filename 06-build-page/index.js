@@ -22,8 +22,9 @@ class FileReplacementStream extends Transform {
   _transform(chunk, encoding, callback) {
     let data = chunk.toString('utf8');
 
-    for (const [placeholder, filePath] of Object.entries(this.replacementMap)) {
-      const replacement = readFileSync(filePath, 'utf8');
+    for (const [placeholder, replacement] of Object.entries(
+      this.replacementMap,
+    )) {
       data = data.replace(`{{${placeholder}}}`, replacement);
     }
 
@@ -59,10 +60,12 @@ async function getTags(componentsDir) {
   }
 }
 
-function getReplacementMap(tags, componentsDir) {
+async function getReplacementMap(tags, componentsDir) {
   const replacementMap = {};
   for (const tag of tags) {
-    replacementMap[tag] = path.join(componentsDir, `${tag}.html`);
+    const filePath = path.join(componentsDir, `${tag}.html`);
+    const fileContent = await fs.readFile(filePath, 'utf8');
+    replacementMap[tag] = fileContent;
   }
   return replacementMap;
 }
@@ -128,9 +131,8 @@ async function main(
     await makeDirectory(projectDistDir);
 
     const tags = await getTags(componentsDir);
-    console.log(tags);
 
-    const replacementMap = getReplacementMap(tags, componentsDir);
+    const replacementMap = await getReplacementMap(tags, componentsDir);
 
     const templateReadStream = createReadStream(templateHtml);
     templateReadStream.on('error', (err) => {
