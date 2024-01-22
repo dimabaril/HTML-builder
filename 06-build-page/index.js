@@ -1,4 +1,4 @@
-const { createReadStream, createWriteStream, readFileSync } = require('fs');
+const { createReadStream, createWriteStream } = require('fs');
 const fs = require('fs').promises;
 const path = require('path');
 
@@ -34,13 +34,15 @@ class FileReplacementStream extends Transform {
   }
 }
 
-async function makeDirectory(dir) {
+async function makeOrRemakeDirectory(dir) {
   try {
-    const dirCreation = await fs.mkdir(dir, { recursive: true });
+    let dirCreation = await fs.mkdir(dir, { recursive: true });
     if (dirCreation) {
-      console.log(`Создан директорий: ${dirCreation}`);
+      console.log(`создан директорий:\n${dirCreation}`);
     } else {
-      console.log(`Директорий уже существует: ${dir}`);
+      console.log(`директорий уже существует, обновим:\n${dir}`);
+      await fs.rm(dir, { recursive: true });
+      dirCreation = await fs.mkdir(dir, { recursive: true });
     }
     return dirCreation;
   } catch (err) {
@@ -61,12 +63,14 @@ async function getTags(componentsDir) {
 }
 
 async function getReplacementMap(tags, componentsDir) {
-  const replacementMap = {};
-  for (const tag of tags) {
-    const filePath = path.join(componentsDir, `${tag}.html`);
-    const fileContent = await fs.readFile(filePath, 'utf8');
-    replacementMap[tag] = fileContent;
-  }
+  const pairs = await Promise.all(
+    tags.map(async (tag) => {
+      const filePath = path.join(componentsDir, `${tag}.html`);
+      const fileContent = await fs.readFile(filePath, 'utf8');
+      return [tag, fileContent];
+    }),
+  );
+  const replacementMap = Object.fromEntries(pairs);
   return replacementMap;
 }
 
@@ -93,6 +97,7 @@ async function mergeFilesTo(fromDir, toFile) {
       const input = createReadStream(filePath);
       input.pipe(output);
     }
+    console.log(`файлы:\n ${filesName}\nобъединены в:\n${toFile}`);
   } catch (err) {
     console.error(err);
   }
@@ -101,19 +106,20 @@ async function mergeFilesTo(fromDir, toFile) {
 async function copyDir(originDir, destinationDir) {
   try {
     const items = await fs.readdir(originDir);
-    for (const item of items) {
+    items.forEach(async (item) => {
       const itemPath = path.join(originDir, item);
       const fileStat = await fs.stat(itemPath);
       if (fileStat.isDirectory()) {
         await fs.mkdir(path.join(destinationDir, item), { recursive: true });
-        await copyDir(itemPath, path.join(destinationDir, item));
+        copyDir(itemPath, path.join(destinationDir, item));
       } else {
         fs.copyFile(
           path.join(originDir, item),
           path.join(destinationDir, item),
         );
       }
-    }
+    });
+    console.log(`директорий:\n${originDir}\nскопирован в:\n${destinationDir}`);
   } catch (err) {
     console.error(err);
   }
@@ -128,7 +134,7 @@ async function main(
   indexHtml,
 ) {
   try {
-    await makeDirectory(projectDistDir);
+    await makeOrRemakeDirectory(projectDistDir);
 
     const tags = await getTags(componentsDir);
 
@@ -150,6 +156,9 @@ async function main(
     });
 
     templateReadStream.pipe(replacementStream).pipe(indexWriteStream);
+    console.log(
+      `файл шаблона:\n${templateHtml}\nнаполнен и записан в:\n${indexHtml}`,
+    );
 
     mergeFilesTo(stylesDir, styleCss);
 
