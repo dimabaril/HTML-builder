@@ -4,13 +4,15 @@ const path = require('path');
 const originDir = path.join(__dirname, 'files');
 const destinationDir = path.join(__dirname, 'files-copy');
 
-async function makeDirectory(destinationDir) {
+async function makeOrRemakeDirectory(destinationDir) {
   try {
-    const dirCreation = await fs.mkdir(destinationDir, { recursive: true });
+    let dirCreation = await fs.mkdir(destinationDir, { recursive: true });
     if (dirCreation) {
-      console.log(`Создан директорий: ${dirCreation}`);
+      console.log(`создан директорий:\n${dirCreation}`);
     } else {
-      console.log(`Директорий уже существует: ${destinationDir}`);
+      console.log(`директорий уже существует, обновим:\n${destinationDir}`);
+      await fs.rm(destinationDir, { recursive: true });
+      dirCreation = await fs.mkdir(destinationDir, { recursive: true });
     }
     return dirCreation;
   } catch (err) {
@@ -21,14 +23,14 @@ async function makeDirectory(destinationDir) {
 async function copyFiles(originDir, destinationDir) {
   try {
     const files = await fs.readdir(originDir);
-    for (const file of files) {
+    files.forEach(async (file) => {
       const originFilePath = path.join(originDir, file);
       const destinationFilePath = path.join(destinationDir, file);
       await fs.copyFile(originFilePath, destinationFilePath);
       console.log(
-        `**********\nfile:\n${originFilePath}\nwas copied to:\n${destinationFilePath}`,
+        `файл:\n${originFilePath}\nскопирован в:\n${destinationFilePath}`,
       );
-    }
+    });
   } catch (err) {
     console.error(err);
   }
@@ -36,7 +38,7 @@ async function copyFiles(originDir, destinationDir) {
 
 async function main(originDir, destinationDir) {
   try {
-    await makeDirectory(destinationDir);
+    await makeOrRemakeDirectory(destinationDir);
     await copyFiles(originDir, destinationDir);
   } catch (err) {
     console.error(err);
