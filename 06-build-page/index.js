@@ -21,15 +21,12 @@ class FileReplacementStream extends Transform {
 
   _transform(chunk, encoding, callback) {
     let data = chunk.toString('utf8');
-
     for (const [placeholder, replacement] of Object.entries(
       this.replacementMap,
     )) {
       data = data.replace(`{{${placeholder}}}`, replacement);
     }
-
     const transformedChunk = Buffer.from(data, 'utf8');
-
     callback(null, transformedChunk);
   }
 }
@@ -50,9 +47,9 @@ async function makeOrRemakeDirectory(dir) {
   }
 }
 
-async function getTags(componentsDir) {
+async function getTagsAccordingFileNames(dir) {
   try {
-    const filesName = await fs.readdir(componentsDir);
+    const filesName = await fs.readdir(dir);
     const namesOnly = filesName.map((fileName) => {
       return path.parse(fileName).name;
     });
@@ -74,30 +71,51 @@ async function getReplacementMap(tags, componentsDir) {
   return replacementMap;
 }
 
-async function getStyleFiles(stylesDir, extension = '.css') {
+async function getStyleFilePaths(stylesDir, extension = '.css') {
   try {
-    const filesName = await fs.readdir(stylesDir);
-    const filesCertainExt = filesName.filter((file) => {
-      return path.extname(file) === extension;
-    });
-    return filesCertainExt;
+    const filesInf = await fs.readdir(stylesDir, { withFileTypes: true });
+    const filePaths = filesInf
+      .filter((fileInf) => {
+        return fileInf.isFile() && path.extname(fileInf.name) === extension;
+      })
+      .map((fileInf) => {
+        return path.join(fileInf.path, fileInf.name);
+      });
+
+    return filePaths;
   } catch (err) {
     console.error(err);
   }
 }
 
+function fillFileByReplacementMap(templateFile, replacementMap, outputFile) {
+  const templateReadStream = createReadStream(templateFile);
+  templateReadStream.on('error', (err) => {
+    console.error(err);
+  });
+  const replacementStream = new FileReplacementStream(replacementMap);
+  replacementStream.on('error', (err) => {
+    console.error(err);
+  });
+  const indexWriteStream = createWriteStream(outputFile);
+  indexWriteStream.on('error', (err) => {
+    console.error(err);
+  });
+  templateReadStream.pipe(replacementStream).pipe(indexWriteStream);
+  console.log(
+    `файл шаблона:\n${templateFile}\nнаполнен и записан в:\n${outputFile}`,
+  );
+}
+
 async function mergeFilesTo(fromDir, toFile) {
   try {
-    const filesName = await getStyleFiles(fromDir);
-    const filesPath = filesName.map((fileName) => {
-      return path.join(fromDir, fileName);
-    });
+    const filePaths = await getStyleFilePaths(fromDir);
     const output = createWriteStream(toFile);
-    for (const filePath of filesPath) {
+    for (const filePath of filePaths) {
       const input = createReadStream(filePath);
       input.pipe(output);
     }
-    console.log(`файлы:\n ${filesName}\nобъединены в:\n${toFile}`);
+    console.log(`файлы:\n ${filePaths}\nобъединены в:\n${toFile}`);
   } catch (err) {
     console.error(err);
   }
@@ -135,33 +153,10 @@ async function main(
 ) {
   try {
     await makeOrRemakeDirectory(projectDistDir);
-
-    const tags = await getTags(componentsDir);
-
+    const tags = await getTagsAccordingFileNames(componentsDir);
     const replacementMap = await getReplacementMap(tags, componentsDir);
-
-    const templateReadStream = createReadStream(templateHtml);
-    templateReadStream.on('error', (err) => {
-      console.error(err);
-    });
-
-    const replacementStream = new FileReplacementStream(replacementMap);
-    replacementStream.on('error', (err) => {
-      console.error(err);
-    });
-
-    const indexWriteStream = createWriteStream(indexHtml);
-    indexWriteStream.on('error', (err) => {
-      console.error(err);
-    });
-
-    templateReadStream.pipe(replacementStream).pipe(indexWriteStream);
-    console.log(
-      `файл шаблона:\n${templateHtml}\nнаполнен и записан в:\n${indexHtml}`,
-    );
-
+    fillFileByReplacementMap(templateHtml, replacementMap, indexHtml);
     mergeFilesTo(stylesDir, styleCss);
-
     copyDir(assetsOriginDir, assetsDestinationDir);
   } catch (err) {
     console.error(err);
