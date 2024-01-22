@@ -108,7 +108,7 @@ async function copyDir(originDir, destinationDir) {
         await fs.mkdir(path.join(destinationDir, item), { recursive: true });
         await copyDir(itemPath, path.join(destinationDir, item));
       } else {
-        await fs.copyFile(
+        fs.copyFile(
           path.join(originDir, item),
           path.join(destinationDir, item),
         );
