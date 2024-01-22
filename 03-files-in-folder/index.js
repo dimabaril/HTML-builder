@@ -29,7 +29,7 @@ function convertBytes(bytes) {
     return '0 Byte';
   }
   const i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)));
-  return Math.round(bytes / Math.pow(1024, i)) + sizes[i];
+  return (bytes / Math.pow(1024, i)).toFixed(2) + sizes[i];
 }
 
 listFilesInfo(dirPath);
